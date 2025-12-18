@@ -1,5 +1,6 @@
+
 {
-  "name": "Briefly - Agency - The Smart Corner",
-  "description": "A professional multi-step briefing application for creative freelancers to collect structured project requirements and generate AI-powered summaries.",
+  "name": "the-smart-corner-app",
+  "description": "Professional briefing and lead generation tool for creative freelancers.",
   "requestFramePermissions": []
 }
