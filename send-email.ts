@@ -4,100 +4,110 @@ import nodemailer from 'nodemailer';
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { contact, details, services, timeline, internalEstimate, lang } = req.body;
+  const { fullName, email, services, projectName, description, deadline, budgetRange, estimate, lang } = req.body;
   
-  // Usar la clave de Gemini
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  let aiSummary = "";
 
-  let aiSummary = "AI Summary unavailable.";
-
-  // 1. GENERAR RESUMEN CON IA
-  if (apiKey) {
+  // 1. GENERAR RESUMEN CON GEMINI
+  // La API Key debe obtenerse exclusivamente de process.env.API_KEY
+  if (process.env.API_KEY) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `
-        Analyze this creative briefing and generate a professional summary in ${lang === 'es' ? 'Spanish' : lang === 'pl' ? 'Polish' : 'English'}.
-        Project: ${details.projectName}
-        Description: ${details.description}
-        Services: ${services.join(', ')}
-        Budget: ${timeline.budgetRange}
-        Format: 1. Need analysis. 2. Technical recommendations. 3. Suggested next steps.
-      `;
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = `Actua como un estratega creativo experto. Analiza este briefing de proyecto y proporciona un resumen profesional e inspirador en el idioma ${lang}.
+      - Proyecto: ${projectName}
+      - Servicios solicitados: ${services.join(', ')}
+      - Briefing: ${description}
+      - Inversión objetivo: ${budgetRange}
+      
+      El tono debe ser experto y alentador. Máximo 150 palabras.`;
+
+      // Se usa ai.models.generateContent directamente
       const aiResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
       });
-      aiSummary = aiResponse.text || "No summary generated.";
-    } catch (err) {
-      console.error("Gemini Error:", err);
-      aiSummary = "Error generating AI summary, but data was saved.";
+      // Acceso directo a la propiedad .text (no es un método)
+      aiSummary = aiResponse.text || "Análisis no disponible en este momento.";
+    } catch (e) {
+      console.error("Gemini Error:", e);
+      aiSummary = "Datos recibidos correctamente, pero el resumen de IA falló temporalmente.";
     }
   }
 
   // 2. CONFIGURAR SMTP
-  const smtpHost = process.env.SMTP_HOST || 'smtp.resend.com';
-  const isResend = smtpHost.includes('resend');
-  
-  // IMPORTANTE: Para Resend el usuario debe ser 'resend'
-  const authUser = isResend ? 'resend' : process.env.SMTP_USER;
-  const authPass = process.env.SMTP_PASS;
-
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
   const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: 465,
     secure: true,
-    auth: { user: authUser, pass: authPass },
+    auth: {
+      user: process.env.SMTP_USER || 'arturonaranxo@gmail.com',
+      pass: process.env.SMTP_PASS
+    }
   });
 
   try {
-    // IMPORTANTE: Resend requiere que el 'from' sea un dominio verificado o 'onboarding@resend.dev'
-    const fromEmail = isResend ? 'onboarding@resend.dev' : process.env.SMTP_USER;
+    // Definimos el remitente solicitado
+    const myEmail = 'arturonaranxo@gmail.com';
 
-    // 3. EMAIL PARA ARTURO
+    // 3. EMAIL PARA ARTURO (FREELANCER)
     await transporter.sendMail({
-      from: `"The Smart Corner" <${fromEmail}>`,
-      to: 'arturonaranxo@gmail.com',
-      subject: `🚀 Nuevo Proyecto: ${details.projectName}`,
+      from: `"Smart Corner Briefing" <${myEmail}>`,
+      to: myEmail,
+      replyTo: email,
+      subject: `🚀 Nuevo Proyecto: ${projectName}`,
       html: `
-        <div style="font-family: sans-serif; background: #0f172a; color: #f8fafc; padding: 40px; border-radius: 20px;">
-          <h1 style="color: #8b5cf6;">Briefing de: ${contact.fullName}</h1>
-          <p><strong>Email Cliente:</strong> ${contact.email}</p>
-          <p><strong>Servicios:</strong> ${services.join(', ')}</p>
-          <p><strong>Rango Presupuesto:</strong> ${timeline.budgetRange}</p>
-          <hr style="border: 1px solid #1e293b; margin: 30px 0;"/>
-          <h2 style="color: #ec4899;">Resumen IA:</h2>
-          <div style="background: #1e293b; padding: 25px; border-radius: 15px; font-style: italic; line-height: 1.6;">
+        <div style="font-family: sans-serif; background: #0f172a; color: #f1f5f9; padding: 40px; border-radius: 20px; line-height: 1.6;">
+          <h1 style="color: #8b5cf6; margin-bottom: 5px;">Nuevo Briefing</h1>
+          <p style="font-size: 14px; opacity: 0.8; margin-top: 0;">De: ${fullName} (${email})</p>
+          
+          <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; margin: 30px 0; border: 1px solid rgba(255,255,255,0.1);">
+            <p><strong>Proyecto:</strong> ${projectName}</p>
+            <p><strong>Servicios:</strong> ${services.join(', ')}</p>
+            <p><strong>Plazo:</strong> ${deadline}</p>
+            <p><strong>Presupuesto:</strong> ${budgetRange}</p>
+            <p><strong>Inversión Base (Calculada):</strong> ${estimate}€</p>
+            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;"/>
+            <p><strong>Descripción:</strong><br/>${description}</p>
+          </div>
+          
+          <h3 style="color: #ec4899; margin-top: 40px;">Análisis Estratégico (IA):</h3>
+          <div style="background: #1e293b; padding: 25px; border-radius: 15px; border-left: 4px solid #ec4899; font-style: italic; color: #cbd5e1;">
             ${aiSummary.replace(/\n/g, '<br/>')}
           </div>
-          <p style="font-size: 11px; color: #64748b; margin-top: 25px; text-align: right;">
-            Cálculo Base Interno: ~${internalEstimate}€
+          
+          <p style="font-size: 10px; text-align: center; margin-top: 50px; opacity: 0.3;">
+            The Smart Corner Automation Engine v2.5
           </p>
         </div>
-      `,
+      `
     });
 
     // 4. CONFIRMACIÓN AL CLIENTE
-    const subjects: any = { en: "Briefing Received", es: "Briefing Recibido", pl: "Briefing Otrzymany" };
-    const texts: any = { 
-      en: `Hi ${contact.fullName}, we have received your project details. We will contact you soon.`,
-      es: `Hola ${contact.fullName}, hemos recibido los detalles de tu proyecto correctamente. Te contactaremos pronto.`,
-      pl: `Cześć ${contact.fullName}, otrzymaliśmy szczegóły Twojego projektu. Wkrótce się skontaktujemy.`
+    const confirmSubjects: Record<string, string> = { 
+      es: "Confirmación de Briefing - The Smart Corner", 
+      en: "Briefing Received - The Smart Corner", 
+      pl: "Briefing Otrzymany - The Smart Corner" 
+    };
+    
+    const confirmTexts: Record<string, string> = { 
+      es: `Hola ${fullName}, he recibido correctamente los detalles de tu proyecto "${projectName}". Revisaré toda la información y te contactaré muy pronto.`,
+      en: `Hi ${fullName}, I have successfully received the details for your project "${projectName}". I will review everything and get back to you shortly.`,
+      pl: `Cześć ${fullName}, otrzymałem szczegóły Twojego projektu "${projectName}". Przeanalizuję wszystko i wkrótce się z Tobą skontaktuję.`
     };
 
     await transporter.sendMail({
-      from: `"The Smart Corner" <${fromEmail}>`,
-      to: contact.email,
-      subject: `${subjects[lang] || subjects.en} - The Smart Corner`,
-      text: texts[lang] || texts.en,
+      from: `"The Smart Corner" <${myEmail}>`,
+      to: email,
+      subject: confirmSubjects[lang] || confirmSubjects.en,
+      text: confirmTexts[lang] || confirmTexts.en
     });
 
     return res.status(200).json({ success: true, aiSummary });
   } catch (error) {
-    console.error("Mail Delivery Error:", error);
-    return res.status(500).json({ error: 'Failed to send email. Check SMTP settings.' });
+    console.error("Mail Error Detail:", error);
+    return res.status(500).json({ error: 'Mail delivery failed. Check SMTP credentials.' });
   }
 }
