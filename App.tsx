@@ -72,15 +72,16 @@ const App: React.FC = () => {
       setStep(5);
     } catch (err) {
       console.error("Submission error:", err);
-      setStep(5); // UX: Mostrar éxito aunque falle el log interno
+      setStep(5);
     } finally { 
       setIsSubmitting(false); 
     }
   };
 
+  const currentTotal = calculateEstimate();
+
   return (
     <div className="min-h-screen flex flex-col items-center p-4 md:p-12 relative z-10">
-      {/* Selector de Idioma */}
       <div className="fixed top-8 right-8 z-50 flex gap-1 p-1 bg-white/5 backdrop-blur-lg border border-white/10 rounded-full">
         {(['en', 'es', 'pl'] as Language[]).map(l => (
           <button 
@@ -117,16 +118,26 @@ const App: React.FC = () => {
 
         {step === 1 && (
           <div className="p-8 md:p-16">
-            <h2 className="text-3xl font-bold text-white mb-12">{t.step_1_title}</h2>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+              <h2 className="text-3xl font-bold text-white">{t.step_1_title}</h2>
+              {currentTotal > 0 && (
+                <div className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.internal_calc}</span>
+                  <span className="text-xl font-black text-pink-500">{currentTotal}€</span>
+                </div>
+              )}
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {SERVICES.map((service) => (
                 <div key={service.id} onClick={() => toggleService(service.id)}
-                  className={`p-8 rounded-3xl glass-card cursor-pointer flex items-start gap-6 ${formData.services.includes(service.id) ? 'active-service' : ''}`}
+                  className={`p-8 rounded-3xl glass-card cursor-pointer flex items-start gap-6 relative overflow-hidden ${formData.services.includes(service.id) ? 'active-service' : ''}`}
                 >
                   <div className="text-4xl bg-white/5 w-16 h-16 flex items-center justify-center rounded-2xl border border-white/5">{service.icon}</div>
                   <div>
                     <h3 className="text-lg font-bold text-white mb-2">{t[service.labelKey]}</h3>
                     <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">{t[service.descriptionKey]}</p>
+                    <p className="mt-3 text-[10px] font-bold text-violet-400 uppercase tracking-widest">Desde {service.basePrice}€</p>
                   </div>
                 </div>
               ))}
